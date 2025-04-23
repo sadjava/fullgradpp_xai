@@ -167,7 +167,7 @@ The method was implemented from scratch in PyTorch without relying on external l
   ```math
   b^l = -\frac{\mu \cdot \gamma}{\sqrt{\sigma^2 + \epsilon}} + \beta
   ```
-  where \( \mu, \sigma^2, \gamma, \beta \) are the batch norm parameters.
+  where $ \mu, \sigma^2, \gamma, \beta $ are the batch norm parameters.
 
 - **Second-Order Derivatives**:
   Used `torch.autograd.grad(..., create_graph=True)` to compute higher-order terms required for Grad-CAM++ logic.
