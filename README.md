@@ -2,6 +2,9 @@
 Authors: Amir Bikineyev, Dzhavid Sadreddinov
 
 Link to the source: [github](https://github.com/sadjava/fullgradpp_xai)
+## Installation 
+The process of inference and installation are same as [here](https://github.com/floringogianu/atari-agents/tree/main)
+
 
 ## Introduction
 
