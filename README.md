@@ -112,7 +112,6 @@ FullGrad is a complete gradient-based explanation method that aggregates gradien
 
 This method captures both deep model internals (via bias gradients) and fine-grained sensitivity (via higher-order gradient contributions), producing comprehensive and sharper visual explanations.
 
----
 
 ### How it Works
 
@@ -120,12 +119,12 @@ The FullGrad++ method consists of the following steps:
 
 1. **Forward Pass and Hooking**:
    - Register hooks on all layers that contain learnable bias parameters (e.g., `Conv2d`, `BatchNorm2d`) to record:
-     - Their output activations \( A^l \)
-     - Their backpropagated gradients \( \nabla_{A^l} y^c \)
-   - Store bias tensors \( b^l \) as well for use in explanation
+     - Their output activations $A^l$
+     - Their backpropagated gradients $\nabla_{A^l} y^c$
+   - Store bias tensors  $b^l$ as well for use in explanation
 
 2. **Backward Pass with Higher-Order Gradients**:
-   - Perform a backward pass from the model’s output \( y^c \) for a target class \( c \)
+   - Perform a backward pass from the model’s output  $y^c$ for a target class $c$
    - Instead of just using first-order gradients, FullGrad++ optionally computes **second-order gradients**:
      ```math
      \text{Grad}_{A^l} = \left( \frac{\partial y^c}{\partial A^l} \right)^2
@@ -184,3 +183,36 @@ The method was implemented from scratch in PyTorch without relying on external l
 - Localizes *fine-grained features* using second-order sensitivity (like Grad-CAM++)
 - Fully differentiable and model-agnostic
 - Smooths and normalizes results for easy visualization
+
+### Results
+Here we can see the results of explanation for the decisions of AtariNet for different games:
+
+####  Breakout:
+
+![Breakout Live](media/breakout_live.gif)
+![Breakout Explanation](media/breakout_live_cam.gif)
+
+
+At the top we see 2 gifs. The left one is actual game where agent is playinig and on the right side we can see the explanation produced by the FullGrad++ method for the actions taken by the agent. As we can see the agent is paying attention on the player itself, the ball and on the nearest blocks which it can break.
+#### Pong:
+![Pong Live](media/pong_live.gif)
+![Pong Explanation](media/pong_live_cam.gif)
+
+
+Here we can see that attention mainly focused on the region where the ball is located which is similar to the way how humans play
+
+#### Enduro
+![Enduro Live](media/enduro_live.gif)
+![Enduro Explanation](media/enduro_live_cam.gif)
+
+In enduro we can see that agent paying attention on player itself and on the new cars that appeared. In the moment when the agent is made the action the agent stops paying on the cars attention
+
+#### VideoPinball
+
+![Videopinball Live](media/videopinball_live.gif)
+![Videopinball Explanation](media/videopinball_live_cam.gif)
+
+In video pinball we see that attention is concentrated in score and on the ball.
+
+
+### References
