@@ -269,6 +269,8 @@ In enduro we can see that agent paying attention on player itself and on the new
 
 In video pinball we see that attention is concentrated in score and on the ball.
 
+### Conclusion
+Our experiments across multiple Atari games (Breakout, Pong, Enduro, and Video Pinball) demonstrated that the agent's attention aligns with intuitive gameplay strategies—focusing on the ball, player-controlled elements, and key environmental objects.
 
 ### References
 [Atari RL agent](https://github.com/floringogianu/atari-agents/tree/main)
