@@ -68,22 +68,22 @@ In general the Grad-CAM algorithm working as follows:
 * Then we passing the input that we want to explain through our model and particularly through our picked layer to obtain feature-map
 * Then we need to calculate the gradients of the predicted class/decision via backward pass with respect to feature maps in the chosen layer. Mathematically speaking:
 
-  $$
+  ```math
   \alpha_k^c = \frac{1}{Z} \sum_{i,j} \frac{\partial y^c}{\partial A_{i,j}^k}
-  $$
+  ```
 
   where $Z$ is the size of the feature map (width × height), $y^c$ is the score for class $c$, and $A_{i,j}^k$ represents the activations of the $k^{\text{th}}$ feature map at spatial location $(i, j)$.
 * After all we need to obtain importance map by multiplying each feature map $A_{}^k$ by the $\alpha_k^c$ and summarize to obtain heatmap
-  $$
+  ```math
   L_{\text{Grad-CAM}}^c = \text{ReLU} \left( \sum_k \alpha_k^c A^k \right)
-  $$
+  ```
 * Then the resulting image we upsampling and overlaying on top of the input image to vizualize the regions that contribute most to the model's decisions.
 ### What is Grad-CAM++?
 
 Grad-CAM++ is an enhanced version of Grad-CAM that produces more precise and localized heatmaps.
 ### Differences from Grad-CAM
 * Grad-CAM++ replaces this uniform averaging with a pixel-wise weighted sum that uses both second- and third-order gradients, emphasizing locations where small activation changes greatly affect the class score:
-  $$
+  ```math
   \alpha_k^c = \sum_{i,j} \left[
   \frac{
   \frac{\partial^2 y^c}{(\partial A_{i,j}^k)^2}
@@ -91,15 +91,15 @@ Grad-CAM++ is an enhanced version of Grad-CAM that produces more precise and loc
   2\frac{\partial^2 y^c}{(\partial A_{i,j}^k)^2} + \sum_{i,j} A_{i,j}^k \frac{\partial^3 y^c}{(\partial A_{i,j}^k)^3}
   }
   \right]
-  $$
+  ```
 ### What is FullGrad?
 FullGrad is a complete gradient-based explanation method that aggregates gradient information from all layers of a neural network (not just one convolutional layer) to explain model decisions. Unlike Grad-CAM, which focuses on a single layer, FullGrad accounts for biases and activations across the entire network, providing more holistic explanations.
 ### How it works?
 * Firstly we need to compute calculate gradients for every layer of the target class/decision of the model with respect to both activations and biases $\nabla_{A^l} y^c $ (activation gradients) $\nabla_{b^l} y^c $ (bias gradients)
 * Then we need to combine gradients and biases across all layers into a single saliency map:
-  $$
+  ```math
   L_{\text{FullGrad}}^c = \sum_l \left( A^l \odot \nabla_{A^l} y^c + b^l \odot \nabla_{b^l} y^c \right)
-  $$
+  ```
   ⊙ - element-wise multiplication
 * After all the final map is upsampled and overlaid on the input image, similar to Grad-CAM.
 
@@ -127,30 +127,30 @@ The FullGrad++ method consists of the following steps:
 2. **Backward Pass with Higher-Order Gradients**:
    - Perform a backward pass from the model’s output \( y^c \) for a target class \( c \)
    - Instead of just using first-order gradients, FullGrad++ optionally computes **second-order gradients**:
-     $$
+     ```math
      \text{Grad}_{A^l} = \left( \frac{\partial y^c}{\partial A^l} \right)^2
-     $$
+     ```
    - This increases the saliency of regions where small changes in activation highly influence the prediction, similar to Grad-CAM++
 
 3. **Bias Gradient Aggregation**:
    - For each bias layer, compute the saliency as the element-wise product:
-     $$
+    ```math
      \text{BiasGrad}_{l} = \left| b^l \cdot \left( \frac{\partial y^c}{\partial b^l} \right)^2 \right|
-     $$
+    ```
    - These maps are interpolated to match the input size
 
 4. **Input Gradient Contribution**:
    - Compute the gradient of the class score with respect to the input image \( x \):
-     $$
+     ```math
      \text{InputGrad} = x \cdot \left| \frac{\partial y^c}{\partial x} \right|
-     $$
+     ```
    - This highlights sensitive areas in the raw input
 
 5. **Combining and Normalizing**:
    - Combine all saliency contributions:
-     $$
+     ```math
      L_{\text{FullGrad++}}^c = \text{InputGrad} + \sum_l \text{BiasGrad}_{l}
-     $$
+     ```
    - Smooth the result with a Gaussian filter to reduce noise
    - Normalize the map to [0, 1] and overlay it on the original input image
 
@@ -165,9 +165,9 @@ The method was implemented from scratch in PyTorch without relying on external l
   
 - **Bias Extraction**:
   BatchNorm2d biases are computed as:
-  $$
+  ```math
   b^l = -\frac{\mu \cdot \gamma}{\sqrt{\sigma^2 + \epsilon}} + \beta
-  $$
+  ```
   where \( \mu, \sigma^2, \gamma, \beta \) are the batch norm parameters.
 
 - **Second-Order Derivatives**:
