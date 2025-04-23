@@ -1,6 +1,8 @@
 # Explaining RL Agents in Atari Games
 Authors: Amir Bikineyev, Dzhavid Sadreddinov
 
+Link to the source: [github](https://github.com/sadjava/fullgradpp_xai)
+
 ## Introduction
 
 By now, many people have at least heard of Atari games — and some have even played them. Classics like our beloved Pong, Breakout, Space Invaders, and others come to mind (see images below). While these games were originally popular in the late 20th century purely for entertainment, today they serve a different purpose for many: their simplicity makes them ideal environments for experimenting with reinforcement learning (RL) agents.
@@ -102,10 +104,12 @@ FullGrad is a complete gradient-based explanation method that aggregates gradien
   ```
   ⊙ - element-wise multiplication
 * After all the final map is upsampled and overlaid on the input image, similar to Grad-CAM.
+### CAM methods example
+Below you can see how heatmaps for each CAM method is works
+![Comparison](media/difference_in_methods.jpg)
+### Techcnique that we used
 
-### What is FullGrad++?
-
-**FullGrad++** is a novel explainability approach that merges the strengths of **FullGrad** and **Grad-CAM++** into a unified framework. It is designed to provide highly detailed, high-fidelity saliency maps by:
+We used an approach that merges the strengths of **FullGrad** and **Grad-CAM++** into a unified framework. It is designed to provide highly detailed, high-fidelity saliency maps by:
 
 - Aggregating **gradient information across all layers** like FullGrad
 - Incorporating **second-order gradient weighting** from Grad-CAM++ for better localization
@@ -115,7 +119,7 @@ This method captures both deep model internals (via bias gradients) and fine-gra
 
 ### How it Works
 
-The FullGrad++ method consists of the following steps:
+This method consists of the following steps:
 
 1. **Forward Pass and Hooking**:
    - Register hooks on all layers that contain learnable bias parameters (e.g., `Conv2d`, `BatchNorm2d`) to record:
@@ -161,6 +165,26 @@ The method was implemented from scratch in PyTorch without relying on external l
 
 - **Hook Registration**:
   Forward and backward hooks are attached dynamically to all bias layers.
+  ```python
+      def _register_hooks(self):
+        def has_bias(layer):
+            return isinstance(layer, (nn.Conv2d, nn.BatchNorm2d)) and layer.bias is not None
+
+        for layer in self.model.modules():
+            if has_bias(layer):
+                layer_id = id(layer)
+                self.biases.append((layer_id, self._extract_bias(layer).to(self.device)))
+
+                def fwd_hook(module, inp, outp):
+                    self.activations.append((id(module), outp))
+
+                def bwd_hook(module, grad_in, grad_out):
+                    self.gradients.append((id(module), grad_out[0]))
+
+
+                layer.register_forward_hook(fwd_hook)
+                layer.register_backward_hook(bwd_hook)
+  ```
   
 - **Bias Extraction**:
   BatchNorm2d biases are computed as:
@@ -169,15 +193,46 @@ The method was implemented from scratch in PyTorch without relying on external l
   ```
   where $\mu$, $\sigma^2$, $\gamma$, $\beta$ are the batch norm parameters.
 
+  ```python
+      def _extract_bias(self, layer):
+        if isinstance(layer, nn.BatchNorm2d):
+            return - (layer.running_mean * layer.weight / torch.sqrt(layer.running_var + layer.eps)) + layer.bias
+        return layer.bias
+  ```
+
 - **Second-Order Derivatives**:
   Used `torch.autograd.grad(..., create_graph=True)` to compute higher-order terms required for Grad-CAM++ logic.
+  ```python
+          if self.use_second_order:
+            # FullGrad and GradCAM++ — use second-order gradients
+            grad = torch.autograd.grad(score, input_tensor, create_graph=True)[0]
+        else:
+            score.backward(retain_graph=True)
+            grad = input_tensor.grad
 
+        cam = torch.abs(grad * input_tensor).sum(dim=1, keepdim=True)
+  ```
 - **Smoothing**:
   Applied a 2D Gaussian blur kernel to the final heatmap for improved clarity.
+  ```python
+      def _apply_smoothing(self, saliency, kernel_size=3, sigma=2):
+        """Apply 2D Gaussian smoothing per image"""
+        if kernel_size % 2 == 0:
+            kernel_size += 1
+        channels = saliency.shape[1]
+        coords = torch.arange(kernel_size, dtype=torch.float32) - kernel_size // 2
+        grid = coords.repeat(kernel_size).view(kernel_size, kernel_size)
+        gauss = torch.exp(-(grid**2 + grid.T**2) / (2 * sigma**2))
+        gauss /= gauss.sum()
 
+        kernel = gauss.view(1, 1, kernel_size, kernel_size).repeat(channels, 1, 1, 1)
+        kernel = kernel.to(saliency.device)
+
+        return F.conv2d(saliency, kernel, padding=kernel_size // 2, groups=channels)
+  ```
 ---
 
-### Advantages of FullGrad++
+### Advantages of this method
 
 - Captures *global context* via multiple layer gradients (like FullGrad)
 - Localizes *fine-grained features* using second-order sensitivity (like Grad-CAM++)
@@ -216,3 +271,10 @@ In video pinball we see that attention is concentrated in score and on the ball.
 
 
 ### References
+[Atari RL agent](https://github.com/floringogianu/atari-agents/tree/main)
+
+[Pytorch Grad-CAM](https://github.com/jacobgil/pytorch-grad-cam/tree/master)
+
+[Grad-CAM++](https://arxiv.org/abs/1710.11063)
+
+[FullGrad](https://arxiv.org/abs/1905.00780)
