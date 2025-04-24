@@ -2,9 +2,39 @@
 Authors: Amir Bikineyev, Dzhavid Sadreddinov
 
 Link to the source: [github](https://github.com/sadjava/fullgradpp_xai)
+
+- [Explaining RL Agents in Atari Games](#explaining-rl-agents-in-atari-games)
+  * [Installation](#installation)
+  * [Introduction](#introduction)
+  * [Agent Overview](#agent-overview)
+    + [The Q-value estimator](#the-q-value-estimator)
+    + [Game process](#game-process)
+  * [CAM methods](#cam-methods)
+    + [What is Grad-CAM?](#what-is-grad-cam-)
+    + [How it Works](#how-it-works)
+    + [What is Grad-CAM++?](#what-is-grad-cam---)
+    + [Differences from Grad-CAM](#differences-from-grad-cam)
+    + [What is FullGrad?](#what-is-fullgrad-)
+    + [How it works?](#how-it-works-)
+    + [CAM methods example](#cam-methods-example)
+    + [Techcnique that we used](#techcnique-that-we-used)
+    + [What is FullGrad++ (Multi-layer Grad-CAM++)?](#what-is-fullgrad----multi-layer-grad-cam----)
+    + [How it Works](#how-it-works-1)
+    + [Implementation Highlights](#implementation-highlights)
+    + [Advantages of This Approach](#advantages-of-this-approach)
+    + [Results](#results)
+      - [Breakout:](#breakout-)
+      - [Pong:](#pong-)
+      - [Enduro](#enduro)
+      - [VideoPinball](#videopinball)
+    + [Conclusion](#conclusion)
+    + [References](#references)
+
+
 ## Installation 
 The process of inference and installation are same as [here](https://github.com/floringogianu/atari-agents/tree/main)
 
+---
 
 ## Introduction
 
@@ -16,7 +46,7 @@ Today, we’ll join that group — but with a slightly different goal. Our task 
 ![pong](media/breakout.png)
 ![pong](media/space_invaders.jpg)
 
-
+--- 
 ## Agent Overview
 ### The Q-value estimator
 
@@ -59,6 +89,7 @@ Below you can see the examples of playing:
 ![pong gif](media/pong_game.gif)
 ![air rade gif](media/air_raid_game.gif)
 
+---
 
 ## CAM methods
 
@@ -121,121 +152,74 @@ We used 2 tecnhiques to explain the decision of the agent:
   
   This method captures both deep model internals (via bias gradients) and fine-grained sensitivity (via higher-order gradient contributions), producing comprehensive and sharper visual explanations.
 
+---
 
-### How experimental approach works
+### What is FullGrad++ (Multi-layer Grad-CAM++)?
 
-This method consists of the following steps:
+**FullGrad++** is an advanced explainability method that extends the precision of **Grad-CAM++** across **multiple layers**, combining it with FullGrad’s principle of complete layerwise aggregation.
 
-1. **Forward Pass and Hooking**:
-   - Register hooks on all layers that contain learnable bias parameters (e.g., `Conv2d`, `BatchNorm2d`) to record:
-     - Their output activations $A^l$
-     - Their backpropagated gradients $\nabla_{A^l} y^c$
-   - Store bias tensors  $b^l$ as well for use in explanation
+Whereas Grad-CAM++ traditionally analyzes a single layer, FullGrad++ evaluates multiple convolutional and normalization layers, assigning them weights based on their activation magnitudes. This allows the method to capture both deep and shallow features contributing to the model’s prediction, producing detailed and spatially precise saliency maps.
 
-2. **Backward Pass with Higher-Order Gradients**:
-   - Perform a backward pass from the model’s output  $y^c$ for a target class $c$
-   - Instead of just using first-order gradients, FullGrad++ optionally computes **second-order gradients**:
-     ```math
-     \text{Grad}_{A^l} = \left( \frac{\partial y^c}{\partial A^l} \right)^2
-     ```
-   - This increases the saliency of regions where small changes in activation highly influence the prediction, similar to Grad-CAM++
+---
 
-3. **Bias Gradient Aggregation**:
-   - For each bias layer, compute the saliency as the element-wise product:
-    ```math
-     \text{BiasGrad}_{l} = \left| b^l \cdot \left( \frac{\partial y^c}{\partial b^l} \right)^2 \right|
-    ```
-   - These maps are interpolated to match the input size
+### How it Works
 
-4. **Input Gradient Contribution**:
-   - Compute the gradient of the class score with respect to the input image \( x \):
-     ```math
-     \text{InputGrad} = x \cdot \left| \frac{\partial y^c}{\partial x} \right|
-     ```
-   - This highlights sensitive areas in the raw input
+The FullGrad++ method involves the following steps:
 
-5. **Combining and Normalizing**:
-   - Combine all saliency contributions:
-     ```math
-     L_{\text{FullGrad++}}^c = \text{InputGrad} + \sum_l \text{BiasGrad}_{l}
-     ```
-   - Smooth the result with a Gaussian filter to reduce noise
-   - Normalize the map to [0, 1] and overlay it on the original input image
+1. **Hooking All Layers**:
+   - Hooks are registered on all layers that contain activations (e.g., `Conv2d`, `BatchNorm2d`)
+   - For each layer, we collect:
+     - **Forward activations** \( A^l \)
+     - **First-order gradients** \( \nabla_{A^l} y^c \)
+
+2. **Second-Order Weight Computation (Grad-CAM++ style)**:
+   - For each activation map, compute:
+     - \( g^1 = \frac{\partial y^c}{\partial A^l} \)
+     - \( g^2 = (g^1)^2 \), \( g^3 = g^2 \cdot g^1 \)
+   - We then calculate the Grad-CAM++ importance weights:
+     $$
+     \alpha_k^c = \frac{g_k^2}{2g_k^2 + A_k \cdot g_k^3 + \epsilon}
+     $$
+     where \( A_k \) is the activation and \( g_k \) is the gradient of the \( k \)-th feature map
+
+3. **Generate Layer-wise CAMs**:
+   - Using weights \( \alpha_k^c \), compute layer-wise saliency maps:
+     $$
+     \text{CAM}_l = \text{ReLU}\left(\sum_k \alpha_k^c A_k^l\right)
+     $$
+
+4. **Aggregation Across Layers**:
+   - Each layer’s saliency map is resized to the input resolution
+   - The final saliency is a **weighted average** of all layer maps:
+     $$
+     L^c = \frac{1}{\sum_l w_l} \sum_l w_l \cdot \text{CAM}_l
+     $$
+     where \( w_l \) is the average activation energy of the layer, used as a weight to reflect its relevance
 
 ---
 
 ### Implementation Highlights
 
-The method was implemented from scratch in PyTorch without relying on external libraries like `pytorch-grad-cam`. Key implementation details include:
+- **Activation-weighted Aggregation**:
+  Each layer contributes to the final explanation proportionally to its average activation magnitude, serving as a dynamic and data-driven weighting scheme.
 
-- **Hook Registration**:
-  Forward and backward hooks are attached dynamically to all bias layers.
-  ```python
-      def _register_hooks(self):
-        def has_bias(layer):
-            return isinstance(layer, (nn.Conv2d, nn.BatchNorm2d)) and layer.bias is not None
+- **Efficient Layer Registration**:
+  Hooks are registered once on initialization. During inference, all necessary data (activations, gradients) are gathered in one forward-backward pass.
 
-        for layer in self.model.modules():
-            if has_bias(layer):
-                layer_id = id(layer)
-                self.biases.append((layer_id, self._extract_bias(layer).to(self.device)))
+- **Standalone and Framework-agnostic**:
+  No external libraries (like `pytorch-grad-cam`) are used. The implementation is pure PyTorch, ensuring flexibility and transparency.
 
-                def fwd_hook(module, inp, outp):
-                    self.activations.append((id(module), outp))
+- **Normalization and Smoothing**:
+  The output saliency map is resized and normalized for visual overlay. Additional Gaussian smoothing can optionally be applied to reduce noise and enhance interpretability.
 
-                def bwd_hook(module, grad_in, grad_out):
-                    self.gradients.append((id(module), grad_out[0]))
-
-
-                layer.register_forward_hook(fwd_hook)
-                layer.register_backward_hook(bwd_hook)
-  ```
-  
-- **Bias Extraction**:
-  BatchNorm2d biases are computed as:
-  ```math
-  b^l = -\frac{\mu \cdot \gamma}{\sqrt{\sigma^2 + \epsilon}} + \beta
-  ```
-  where $\mu$, $\sigma^2$, $\gamma$, $\beta$ are the batch norm parameters.
-
-  ```python
-      def _extract_bias(self, layer):
-        if isinstance(layer, nn.BatchNorm2d):
-            return - (layer.running_mean * layer.weight / torch.sqrt(layer.running_var + layer.eps)) + layer.bias
-        return layer.bias
-  ```
-
-- **Second-Order Derivatives**:
-  Used `torch.autograd.grad(..., create_graph=True)` to compute higher-order terms required for Grad-CAM++ logic.
-  ```python
-          if self.use_second_order:
-            # FullGrad and GradCAM++ — use second-order gradients
-            grad = torch.autograd.grad(score, input_tensor, create_graph=True)[0]
-        else:
-            score.backward(retain_graph=True)
-            grad = input_tensor.grad
-
-        cam = torch.abs(grad * input_tensor).sum(dim=1, keepdim=True)
-  ```
-- **Smoothing**:
-  Applied a 2D Gaussian blur kernel to the final heatmap for improved clarity.
-  ```python
-      def _apply_smoothing(self, saliency, kernel_size=3, sigma=2):
-        """Apply 2D Gaussian smoothing per image"""
-        if kernel_size % 2 == 0:
-            kernel_size += 1
-        channels = saliency.shape[1]
-        coords = torch.arange(kernel_size, dtype=torch.float32) - kernel_size // 2
-        grid = coords.repeat(kernel_size).view(kernel_size, kernel_size)
-        gauss = torch.exp(-(grid**2 + grid.T**2) / (2 * sigma**2))
-        gauss /= gauss.sum()
-
-        kernel = gauss.view(1, 1, kernel_size, kernel_size).repeat(channels, 1, 1, 1)
-        kernel = kernel.to(saliency.device)
-
-        return F.conv2d(saliency, kernel, padding=kernel_size // 2, groups=channels)
-  ```
 ---
+
+### Advantages of This Approach
+
+**Precision**: Second-order weighting from Grad-CAM++ enables more accurate focus on fine-grained regions.  
+**Completeness**: Multi-layer aggregation captures the full feature hierarchy of the model.  
+**Flexibility**: Supports any architecture with convolutional and normalization layers.  
+**Interpretability**: Dynamic weighting makes it easier to understand which layers and features contribute most.
 
 ### Results
 Here we can see the results of explanation for the decisions of AtariNet for different games:
