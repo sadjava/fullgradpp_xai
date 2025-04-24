@@ -111,16 +111,18 @@ FullGrad is a complete gradient-based explanation method that aggregates gradien
 Below you can see how heatmaps for each CAM method is works
 ![Comparison](media/difference_in_methods.jpg)
 ### Techcnique that we used
+We used 2 tecnhiques to explain the decision of the agent:
 
-We used an approach that merges the strengths of **FullGrad** and **Grad-CAM++** into a unified framework. It is designed to provide highly detailed, high-fidelity saliency maps by:
+* Fullgrad approach: We build classic fullgrad algorithm to hook the features part of AtariNet.
+* Experimental approach. This method merges the strengths of **FullGrad** and **Grad-CAM++** into a unified framework. It is designed to provide highly detailed, high-fidelity saliency maps by:
 
-- Aggregating **gradient information across all layers** like FullGrad
-- Incorporating **second-order gradient weighting** from Grad-CAM++ for better localization
+  - Aggregating **gradient information across all layers** like FullGrad
+  - Incorporating **second-order gradient weighting** from Grad-CAM++ for better localization
+  
+  This method captures both deep model internals (via bias gradients) and fine-grained sensitivity (via higher-order gradient contributions), producing comprehensive and sharper visual explanations.
 
-This method captures both deep model internals (via bias gradients) and fine-grained sensitivity (via higher-order gradient contributions), producing comprehensive and sharper visual explanations.
 
-
-### How it Works
+### How experimental approach works
 
 This method consists of the following steps:
 
@@ -234,13 +236,6 @@ The method was implemented from scratch in PyTorch without relying on external l
         return F.conv2d(saliency, kernel, padding=kernel_size // 2, groups=channels)
   ```
 ---
-
-### Advantages of this method
-
-- Captures *global context* via multiple layer gradients (like FullGrad)
-- Localizes *fine-grained features* using second-order sensitivity (like Grad-CAM++)
-- Fully differentiable and model-agnostic
-- Smooths and normalizes results for easy visualization
 
 ### Results
 Here we can see the results of explanation for the decisions of AtariNet for different games:
