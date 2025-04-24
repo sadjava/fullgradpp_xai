@@ -136,15 +136,9 @@ class FullGradpp:
         cam_per_target_layer = []
         weight_per_target_layer = []
         eps = 1e-7
-        for i in range(len(self.target_layers)):
-            layer_activations = None
-            layer_grads = None
-            if i < len(self.activations):
-                layer_activations = self.activations[i]
-            if i < len(self.gradients):
-                layer_grads = self.gradients[i]
-
-            A = layer_activations
+        assert len(self.target_layers) == len(self.activations)
+        for layer_activations, layer_grads in zip(self.activations, self.gradients):
+            A = np.maximum(layer_activations, 0)
             g1 = layer_grads
 
             g2 = g1 ** 2

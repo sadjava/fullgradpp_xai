@@ -7,7 +7,7 @@ import torch
 from torch import nn
 
 import matplotlib.pyplot as plt
-from gradcam import FullGradpp
+from gradcam import FullGradpp, FullGrad
 from utils import visualize_cam
 
 from ale_env import ALEModern, ALEClassic
@@ -108,7 +108,12 @@ def main(opt):
     model.load_state_dict(ckpt["estimator_state"])
 
     model_dict = dict(type='atarinet', arch=model, input_size=(84, 84))
-    gradcam = FullGradpp(model_dict)
+    if opt.mode == "fullgrad":
+        gradcam = FullGrad(model_dict)
+    elif opt.mode == "fullgradpp":
+        gradcam = FullGradpp(model_dict)
+    else:
+        raise NotImplementedError()
 
     # configure policy
     policy = partial(_epsilon_greedy, model=model, eps=0.001)
@@ -138,6 +143,7 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     # parser.add_argument("game", type=str, help="game name")
     parser.add_argument("path", type=str, help="path to the model")
+    parser.add_argument("-m", "--mode", default='fullgrad', type=str, help="mode of explanation")
     parser.add_argument(
         "-e", "--episodes", default=10, type=int, help="number of episodes"
     )
