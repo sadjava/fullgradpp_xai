@@ -12,7 +12,6 @@ from utils import visualize_cam
 
 from ale_env import ALEModern, ALEClassic
 
-
 class AtariNet(nn.Module):
     """ Estimator used by DQN-style algorithms for ATARI games.
         Works with DQN, M-DQN and C51.
@@ -109,7 +108,7 @@ def main(opt):
     model.load_state_dict(ckpt["estimator_state"])
 
     model_dict = dict(type='atarinet', arch=model, input_size=(84, 84))
-    gradcam = FullGradpp(model_dict, smoothing=False)
+    gradcam = FullGradpp(model_dict)
 
     # configure policy
     policy = partial(_epsilon_greedy, model=model, eps=0.001)
@@ -121,12 +120,12 @@ def main(opt):
             obs = obs.float()
             action, _ = policy(obs)
 
-            mask, logit = gradcam(obs, class_idx=action)
+            mask = gradcam(obs, class_idx=1)
             heatmap, cam_result = visualize_cam(mask, obs[:, 1:].detach())
             # Concatenate the heatmap and the cam_result with torch
-            cam_result = torch.cat([cam_result, heatmap], dim=1)
+            cam_result = torch.cat([cam_result, heatmap], dim=1).permute(1, 2, 0).cpu().numpy()
             
-            plt.imshow(cam_result.permute(1, 2, 0).numpy())
+            plt.imshow(cam_result)
             plt.show(block=False)
             plt.pause(0.0001)
             plt.clf()
