@@ -120,7 +120,7 @@ def main(opt):
             obs = obs.float()
             action, _ = policy(obs)
 
-            mask = gradcam(obs, class_idx=1)
+            mask = gradcam(obs, class_idx=action)
             heatmap, cam_result = visualize_cam(mask, obs[:, 1:].detach())
             # Concatenate the heatmap and the cam_result with torch
             cam_result = torch.cat([cam_result, heatmap], dim=1).permute(1, 2, 0).cpu().numpy()
